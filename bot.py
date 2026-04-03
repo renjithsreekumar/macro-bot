@@ -1,10 +1,12 @@
 import yfinance as yf
 import requests
 from datetime import datetime
+import time
+import os
 
-# ====== YOUR CONFIG ======
-TOKEN = "8797176582:AAFbS1N-bv0xazsBOTgQqPrfVX1BEmtw8xU"
-CHAT_ID = "1465180523"
+# ====== ENV VARIABLES ======
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 # ====== FUNCTION TO GET TREND ======
 def get_trend(ticker):
@@ -29,58 +31,48 @@ def get_trend(ticker):
     except:
         return "SIDEWAYS"
 
-# ====== FETCH DATA ======
-dxy = get_trend("DX-Y.NYB")
-gold = get_trend("GC=F")
-oil = get_trend("CL=F")
-nifty = get_trend("^NSEI")
-btc = get_trend("BTC-USD")
-yields = get_trend("^TNX")
+# ====== MAIN BOT FUNCTION ======
+def run_bot():
+    dxy = get_trend("DX-Y.NYB")
+    gold = get_trend("GC=F")
+    oil = get_trend("CL=F")
+    nifty = get_trend("^NSEI")
+    btc = get_trend("BTC-USD")
+    yields = get_trend("^TNX")
 
-# ====== SCORING ======
-score = 0
+    score = 0
+    score += 1 if dxy == "DOWN" else -1
+    score += 1 if gold == "DOWN" else -1
+    score += 1 if yields == "UP" else -1
+    score += 1 if oil == "UP" else -1
+    score += 1 if nifty == "UP" else -1
+    score += 1 if btc == "UP" else -1
 
-score += 1 if dxy == "DOWN" else -1
-score += 1 if gold == "DOWN" else -1
-score += 1 if yields == "UP" else -1
-score += 1 if oil == "UP" else -1
-score += 1 if nifty == "UP" else -1
-score += 1 if btc == "UP" else -1
+    if score >= 5:
+        signal = "🔥 STRONG RISK-ON"
+        action = "BUY NIFTY, STOCKS, BTC\nAVOID GOLD"
+    elif score >= 3:
+        signal = "🟢 RISK-ON"
+        action = "BUY ON DIPS\nPARTIAL POSITIONS"
+    elif score >= 1:
+        signal = "🟡 WEAK BULL"
+        action = "LIGHT TRADING ONLY"
+    elif score <= -5:
+        signal = "💣 PANIC"
+        action = "EXIT ALL\nBUY GOLD"
+    elif score <= -3:
+        signal = "🔴 RISK-OFF"
+        action = "SELL EQUITIES\nBUY GOLD"
+    else:
+        signal = "⚪ NEUTRAL"
+        action = "WAIT / NO TRADE"
 
-# ====== SIGNAL ======
-if score >= 5:
-    signal = "🔥 STRONG RISK-ON"
-elif score >= 3:
-    signal = "🟢 RISK-ON"
-elif score >= 1:
-    signal = "🟡 WEAK BULL"
-elif score <= -5:
-    signal = "💣 PANIC"
-elif score <= -3:
-    signal = "🔴 RISK-OFF"
-else:
-    signal = "⚪ NEUTRAL"
+    confidence = round((abs(score) / 6) * 100, 1)
 
-# ====== ACTION ======
-if score >= 5:
-    action = "BUY NIFTY, STOCKS, BTC\nAVOID GOLD"
-elif score >= 3:
-    action = "BUY ON DIPS\nPARTIAL POSITIONS"
-elif score >= 1:
-    action = "LIGHT TRADING ONLY"
-elif score <= -3:
-    action = "SELL EQUITIES\nBUY GOLD"
-else:
-    action = "WAIT / NO TRADE"
-
-# ====== CONFIDENCE ======
-confidence = round((abs(score) / 6) * 100, 1)
-
-# ====== MESSAGE ======
-msg = f"""
+    msg = f"""
 📊 DSM-7 DAILY SIGNAL
 
-Date: {datetime.now().strftime('%d %b %Y')}
+Date: {datetime.now().strftime('%d %b %Y %H:%M')}
 
 Score: {score}
 Confidence: {confidence}%
@@ -98,11 +90,15 @@ BTC: {btc}
 {action}
 """
 
-# ====== SEND TELEGRAM ======
-try:
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-    print("✅ Signal sent successfully!")
-except:
-    print("❌ Error sending message")
-    
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
+        print("✅ Signal sent!")
+    except:
+        print("❌ Error sending")
+
+# ====== LOOP (AUTO RUN) ======
+while True:
+    run_bot()
+    print("⏳ Waiting 24 hours...")
+    time.sleep(86400)  # 24 hours
