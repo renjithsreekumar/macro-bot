@@ -1,104 +1,89 @@
-import yfinance as yf
 import requests
-from datetime import datetime
-import time
 import os
+import time
+from datetime import datetime
+import pytz
 
-# ====== ENV VARIABLES ======
-TOKEN = os.getenv("TOKEN")
+# =========================
+# ENV VARIABLES
+# =========================
+BOT_TOKEN = os.getenv("TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# ====== FUNCTION TO GET TREND ======
-def get_trend(ticker):
+# =========================
+# TELEGRAM FUNCTION
+# =========================
+def send_telegram(message):
     try:
-        data = yf.download(ticker, period="5d", interval="1d", progress=False)
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-        if data is None or len(data) < 2:
-            return "SIDEWAYS"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": message
+        }
 
-        close_prices = data["Close"]
+        response = requests.post(url, data=payload)
 
-        last = float(close_prices.iloc[-1])
-        prev = float(close_prices.iloc[-2])
+        print("📡 Telegram Status:", response.status_code)
+        print("📩 Telegram Response:", response.text)
 
-        if last > prev:
-            return "UP"
-        elif last < prev:
-            return "DOWN"
-        else:
-            return "SIDEWAYS"
+    except Exception as e:
+        print("❌ Telegram Error:", e)
 
-    except:
-        return "SIDEWAYS"
 
-# ====== MAIN BOT FUNCTION ======
+# =========================
+# SIGNAL LOGIC (DUMMY NOW)
+# Replace with your SMA logic later
+# =========================
+def generate_signal():
+    # You can plug your SMA / Trading logic here
+
+    return {
+        "symbol": "NIFTY",
+        "action": "BUY",
+        "price": "Market Price",
+        "strategy": "SMA 8/20 Crossover"
+    }
+
+
+# =========================
+# MAIN BOT LOOP
+# =========================
 def run_bot():
-    dxy = get_trend("DX-Y.NYB")
-    gold = get_trend("GC=F")
-    oil = get_trend("CL=F")
-    nifty = get_trend("^NSEI")
-    btc = get_trend("BTC-USD")
-    yields = get_trend("^TNX")
+    ist = pytz.timezone('Asia/Kolkata')
 
-    score = 0
-    score += 1 if dxy == "DOWN" else -1
-    score += 1 if gold == "DOWN" else -1
-    score += 1 if yields == "UP" else -1
-    score += 1 if oil == "UP" else -1
-    score += 1 if nifty == "UP" else -1
-    score += 1 if btc == "UP" else -1
+    while True:
+        try:
+            now = datetime.now(ist)
 
-    if score >= 5:
-        signal = "🔥 STRONG RISK-ON"
-        action = "BUY NIFTY, STOCKS, BTC\nAVOID GOLD"
-    elif score >= 3:
-        signal = "🟢 RISK-ON"
-        action = "BUY ON DIPS\nPARTIAL POSITIONS"
-    elif score >= 1:
-        signal = "🟡 WEAK BULL"
-        action = "LIGHT TRADING ONLY"
-    elif score <= -5:
-        signal = "💣 PANIC"
-        action = "EXIT ALL\nBUY GOLD"
-    elif score <= -3:
-        signal = "🔴 RISK-OFF"
-        action = "SELL EQUITIES\nBUY GOLD"
-    else:
-        signal = "⚪ NEUTRAL"
-        action = "WAIT / NO TRADE"
+            print("⏰ Running at:", now)
 
-    confidence = round((abs(score) / 6) * 100, 1)
+            signal = generate_signal()
 
-    msg = f"""
-📊 DSM-7 DAILY SIGNAL
+            message = f"""
+📊 TRADE SIGNAL
 
-Date: {datetime.now().strftime('%d %b %Y %H:%M')}
+📈 Stock: {signal['symbol']}
+🟢 Action: {signal['action']}
+💰 Price: {signal['price']}
+📌 Strategy: {signal['strategy']}
 
-Score: {score}
-Confidence: {confidence}%
-
-Signal: {signal}
-
-DXY: {dxy}
-Gold: {gold}
-Yields: {yields}
-Oil: {oil}
-NIFTY: {nifty}
-BTC: {btc}
-
-📈 ACTION:
-{action}
+🕒 Time: {now.strftime('%Y-%m-%d %H:%M:%S')}
 """
 
-    try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-        print("✅ Signal sent!")
-    except:
-        print("❌ Error sending")
+            send_telegram(message)
 
-# ====== LOOP (AUTO RUN) ======
-while True:
+        except Exception as e:
+            print("❌ Bot Error:", e)
+
+        # Wait 24 hours
+        print("⏳ Sleeping for 24 hours...\n")
+        time.sleep(86400)
+
+
+# =========================
+# START BOT
+# =========================
+if __name__ == "__main__":
+    print("🚀 Bot Started...")
     run_bot()
-    print("⏳ Waiting 24 hours...")
-    time.sleep(86400)  # 24 hours
